@@ -1,0 +1,21 @@
+version: '3'
+services:
+    decoding-sdk-server:
+        image: abxregistry.azurecr.io/abx-decoding-sdk:31122024
+        restart: unless-stopped
+        ports:
+            - "8080:8010"
+        command: /home/speechuser/start_master.sh -p 8010
+
+    decoding-sdk-worker:
+        image: abxregistry.azurecr.io/abx-decoding-sdk:31122024
+        restart: unless-stopped
+        volumes:
+            # mapping volumes
+            - ./models/:/opt/models/
+        environment:
+            - INSTANCE_NUM=2
+            - MASTER=decoding-sdk-server:8010
+            - MODEL_DIR=28122023-onnx
+            - SDK_VERSION=onnx
+        command: /home/speechuser/start_worker.sh -m decoding-sdk-server -p 8080
