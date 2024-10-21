@@ -8,20 +8,15 @@ from typing import Union
 
 from dotenv import load_dotenv
 from openai import OpenAI
-from deepgram import DeepgramClient, PrerecordedOptions, FileSource
 import pygame
 from pygame import mixer
 from tts import get_audio_response
 
 from record import speech_to_text
-
-# from groq_stt import groq_transcribe
-from llm import LLM
+# from llm import LLM
 import json
 from datetime import datetime
-from rag_tools import reflect_tool
-import stat
-
+from local_file_stt import transcribe_audio_file
 
 # Load API keys
 load_dotenv()
@@ -29,18 +24,15 @@ DEEPGRAM_API_KEY = os.getenv("DEEPGRAM_API_KEY")
 
 # Initialize APIs
 # deepgram = Deepgram(DEEPGRAM_API_KEY)
-deepgram = DeepgramClient(DEEPGRAM_API_KEY)
 # mixer is a pygame module for playing audio
 mixer.init()
 
 # Change the context if you want to change Jarvis' personality
 system_prompt = "You are Jarvis, Brandon's human assistant. You are witty and full of personality. Your answers should usually be crisp in 1-2 short sentences, unless a discussion is rightfully necessary."
-# conversation = {"Conversation": []}
-conversation = []
 RECORDING_PATH = "audio/recording.wav"
 
 
-def request_gpt(prompt: str) -> str:
+def request_gpt(messages: list[dict]) -> str:
     """
     Send a prompt to the GPT-3 API and return the response.
 
@@ -58,55 +50,9 @@ def request_gpt(prompt: str) -> str:
     response = client.chat.completions.create(
         model="gpt-4o-mini",
         temperature=0,
-        messages=[{"role": "user", "content": prompt}],
+        messages=messages,
     )
     return response.choices[0].message.content
-
-
-async def deepgram_transcribe(
-    file_name: Union[Union[str, bytes, PathLike[str], PathLike[bytes]], int]
-):
-    """
-    Transcribe audio using Deepgram API.
-
-    Args:
-        - file_name: The name of the file to transcribe.
-
-    Returns:
-        The response from the API.
-    """
-    # with open(file_name, "rb") as audio:
-    #     source = {"buffer": audio, "mimetype": "audio/wav"}
-    #     response = await deepgram.transcription.prerecorded(source)
-    #     return response["results"]["channels"][0]["alternatives"][0]["words"]
-    with open(file_name, "rb") as audio:
-        try:
-            # STEP 1 Create a Deepgram client using the DEEPGRAM_API_KEY from environment variables
-            buffer_data = audio.read()
-
-            payload: FileSource = {
-                "buffer": buffer_data,
-            }
-
-            # STEP 2 Call the transcribe_url method on the prerecorded class
-            options = PrerecordedOptions(
-                model="nova-2",
-                smart_format=True,
-                summarize="v2",
-                # detect_language=True,
-            )
-            file_response = deepgram.listen.prerecorded.v("1").transcribe_file(
-                payload, options
-            )
-
-            json_data = file_response.to_json()
-            data = json.loads(json_data)
-
-            # return data["results"]["summary"]["short"]
-            return data["results"]["channels"][0]["alternatives"][0]["transcript"]
-
-        except Exception as e:
-            print(f"Exception: {e}")
 
 
 def log(log: str):
@@ -161,12 +107,13 @@ if __name__ == "__main__":
         speech_to_text()
         log("Done listening")
         llm_conversation = []
+        conversation = []
         # Transcribe audio
         current_time = time()
         # human_reply = groq_transcribe(RECORDING_PATH)
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        human_reply = loop.run_until_complete(deepgram_transcribe(RECORDING_PATH))
+        human_reply = transcribe_audio_file(RECORDING_PATH, "54.255.127.241")
         # human_reply = " ".join(
         #     word_dict.get("word") for word_dict in words if "word" in word_dict
         # )
@@ -188,9 +135,7 @@ if __name__ == "__main__":
                 "content": human_reply,
             }
         )
-        ai_response = LLM(system_message=system_prompt).generate_response(
-            messages=conversation
-        )
+        ai_response = request_gpt(messages=conversation)
         # ai_response = reflect_tool(human_reply, conversation)
         conversation.append({"role": "assistant", "content": ai_response})
         llm_conversation.append(

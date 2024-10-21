@@ -3,3 +3,6 @@ models
 audio
 venv
 __pycache__
+.env
+status.txt
+entries
