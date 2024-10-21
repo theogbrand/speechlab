@@ -31,7 +31,13 @@ FORMAT = pyaudio.paInt16
 CHANNELS = 1
 RATE = 16000
 CHUNK = int(RATE / 10)  # 100ms
+# 640 bytes, 1280 bytes
+# 1second of audio data = sampling rate (byte_rate) * 2 bytes
 
+# their model is trained with 16khz. 44.1/48 khz is the norm for airpods, but code handles downsampling
+# sampling rate = 16000 (16 kHz)
+# modern devices try to use higher sampling rates to generate more info but require more bandwidth to transfer the data
+# check that monochannel (WAV) audio is sent, stereochannel MP3 data type is not supported; 
 
 def rate_limited(maxPerSecond):
     minInterval = 1.0 / float(maxPerSecond)
