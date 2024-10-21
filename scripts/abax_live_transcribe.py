@@ -120,7 +120,7 @@ class AbaxStreamingClient(WebSocketClient):
             if 'result' in response:
                 trans = response['result']['hypotheses'][0]['transcript']
                 if response['result']['final']:
-                    print(response)
+                    # print(response)
                     dt2 = datetime.now()
                     delta = (dt2 - self.dt1).total_seconds()
                     trans = trans.replace("<unk>","").lower()
@@ -128,7 +128,7 @@ class AbaxStreamingClient(WebSocketClient):
                     #print("\033[H\033[J") # clear console for better output
                     # if (trans != "<blank>") and (trans != "") and (trans != "ya") and (trans != "i") and (trans != "a") and (trans != "okay") and (trans != "嗯"):
                     self.final_hyps.append(trans)
-                    print ("+" + str(delta) + ": " + trans)
+                    # print ("+" + str(delta) + ": " + trans)
         else:
             if 'message' in response:
                 print("Server message: %s" %  response['message'])
