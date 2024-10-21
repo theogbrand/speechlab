@@ -1,0 +1,15 @@
+python-dotenv==1.0.0
+openai==1.4.0
+deepgram-sdk==3.*
+pyaudio==0.2.14
+rhasspy-silence==0.4.0
+pygame==2.5.2
+taipy==3.0.0
+requests
+groq
+boto3
+boto3[client]
+anthropic
+google-cloud-aiplatform
+google-auth
+keyboard

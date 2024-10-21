@@ -126,7 +126,7 @@ class AbaxStreamingClient(WebSocketClient):
             if 'result' in response:
                 trans = response['result']['hypotheses'][0]['transcript']
                 if response['result']['final']:
-                    print(response)
+                    # print(response)
                     dt2 = datetime.now()
                     delta = (dt2 - self.dt1).total_seconds()
                     trans = trans.replace("<unk>","").lower()
@@ -134,7 +134,7 @@ class AbaxStreamingClient(WebSocketClient):
                     #print("\033[H\033[J") # clear console for better output
                     # if (trans != "<blank>") and (trans != "") and (trans != "ya") and (trans != "i") and (trans != "a") and (trans != "okay") and (trans != "嗯"):
                     self.final_hyps.append(trans)
-                    print ("+" + str(delta) + ": " + trans)
+                    # print ("+" + str(delta) + ": " + trans)
         else:
             if 'message' in response:
                 print("Server message: %s" %  response['message'])
@@ -172,7 +172,18 @@ def main():
                     args.uri + '?%s' % (urllib.parse.urlencode([("content-type", content_type)])) + '&%s' % (urllib.parse.urlencode([("accessToken", args.token)])) + '&%s' % (urllib.parse.urlencode([("token", args.token)])) + '&%s' % (urllib.parse.urlencode([("model", args.model)])), 
                     byterate=args.rate,
                     save_adaptation_state_filename=args.save_adaptation_state, send_adaptation_state_filename=args.send_adaptation_state)
-
+        print(
+            args.mode,
+            args.audiofile,
+            args.uri
+            + "?%s" % (urllib.parse.urlencode([("content-type", content_type)]))
+            + "&%s" % (urllib.parse.urlencode([("accessToken", args.token)]))
+            + "&%s" % (urllib.parse.urlencode([("token", args.token)]))
+            + "&%s" % (urllib.parse.urlencode([("model", args.model)])),
+            args.rate,
+            args.save_adaptation_state,
+            args.send_adaptation_state,
+        )
         ws.connect()
         result = ws.get_full_hyp()
 
