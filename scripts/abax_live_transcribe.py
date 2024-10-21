@@ -166,7 +166,18 @@ def main():
                     args.uri + '?%s' % (urllib.parse.urlencode([("content-type", content_type)])) + '&%s' % (urllib.parse.urlencode([("accessToken", args.token)])) + '&%s' % (urllib.parse.urlencode([("token", args.token)])) + '&%s' % (urllib.parse.urlencode([("model", args.model)])), 
                     byterate=args.rate,
                     save_adaptation_state_filename=args.save_adaptation_state, send_adaptation_state_filename=args.send_adaptation_state)
-
+        print(
+            args.mode,
+            args.audiofile,
+            args.uri
+            + "?%s" % (urllib.parse.urlencode([("content-type", content_type)]))
+            + "&%s" % (urllib.parse.urlencode([("accessToken", args.token)]))
+            + "&%s" % (urllib.parse.urlencode([("token", args.token)]))
+            + "&%s" % (urllib.parse.urlencode([("model", args.model)])),
+            args.rate,
+            args.save_adaptation_state,
+            args.send_adaptation_state,
+        )
         ws.connect()
         result = ws.get_full_hyp()
 
