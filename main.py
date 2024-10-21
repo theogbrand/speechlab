@@ -21,8 +21,8 @@ mixer.init()
 
 # Change the context if you want to change Jarvis' personality
 system_prompt = "You are Jarvis, Brandon's human assistant. You are witty and full of personality. Your answers should usually be crisp in 1-2 short sentences, unless a discussion is rightfully necessary."
-RECORDING_PATH = "audio/recording.wav"
-
+LOCAL_RECORDING_PATH = "audio/recording.wav"
+SAVE_CONVERSATION_DIR = "entries"
 
 def ask_ai(messages: list[dict]) -> str:
     """
@@ -61,27 +61,28 @@ def to_epoch(dt):
 
 
 def add_conversation_data(conversations_arr):
-    directory = "entries"
+    if not os.path.exists(SAVE_CONVERSATION_DIR):
+        os.makedirs(SAVE_CONVERSATION_DIR)
 
     now = datetime.now()
     start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
     current_day_epoch = to_epoch(start_of_day)
 
     matching_files = []
-    for filename in os.listdir(directory):
+    for filename in os.listdir(SAVE_CONVERSATION_DIR):
         if filename.endswith(".json") and str(current_day_epoch) in filename:
             matching_files.append(filename)
 
     if len(matching_files) == 0:
         new_filename = f"{current_day_epoch}.json"
-        file_path = os.path.join(directory, new_filename)
+        file_path = os.path.join(SAVE_CONVERSATION_DIR, new_filename)
         with open(file_path, "w") as f:
             json.dump(
                 {"date": current_day_epoch, "conversations": conversations_arr}, f
             )
     
     for file in matching_files:
-        with open(os.path.join(directory, file), "r+") as f:
+        with open(os.path.join(SAVE_CONVERSATION_DIR, file), "r+") as f:
             data = json.load(f)
             data["conversations"].extend(conversations_arr)
             f.seek(0)
@@ -101,7 +102,7 @@ if __name__ == "__main__":
         current_time = time()
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        human_reply = transcribe_audio_file(RECORDING_PATH, "54.255.127.241")
+        human_reply = transcribe_audio_file(LOCAL_RECORDING_PATH, "54.255.127.241")
         transcription_time = time() - current_time
         log(f"Finished transcribing in {transcription_time:.2f} seconds.")
 

@@ -27,6 +27,8 @@ def speech_to_text() -> None:
     recorder.start()
     # file directory
     wav_sink = "audio/"
+    # Create the directory if it doesn't exist
+    Path(wav_sink).mkdir(parents=True, exist_ok=True)
     # file name
     wav_filename = "recording"
     if wav_sink:
