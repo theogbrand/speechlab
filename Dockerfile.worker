@@ -1,0 +1,12 @@
+FROM ogbrand25/speechhub-engine:v0
+
+ENV INSTANCE_NUM=2
+ENV MASTER=decoding-sdk-server:8010
+ENV MODEL_DIR=28122023-onnx
+ENV SDK_VERSION=onnx
+
+RUN mkdir -p /opt/models
+
+WORKDIR /home/speechuser
+
+CMD ["/home/speechuser/start_worker.sh", "-m", "decoding-sdk-server", "-p", "8080"]

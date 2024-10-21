@@ -1,0 +1,5 @@
+FROM ogbrand25/speechhub-engine:v0
+
+WORKDIR /home/speechuser
+
+CMD ["/home/speechuser/start_master.sh", "-p", "8010"]
