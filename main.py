@@ -1,10 +1,6 @@
-"""Main file for the Jarvis project"""
-
 import os
-from os import PathLike
 from time import time
 import asyncio
-from typing import Union
 
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -13,17 +9,13 @@ from pygame import mixer
 from tts import get_audio_response
 
 from record import speech_to_text
-# from llm import LLM
 import json
 from datetime import datetime
 from local_file_stt import transcribe_audio_file
 
 # Load API keys
 load_dotenv()
-DEEPGRAM_API_KEY = os.getenv("DEEPGRAM_API_KEY")
 
-# Initialize APIs
-# deepgram = Deepgram(DEEPGRAM_API_KEY)
 # mixer is a pygame module for playing audio
 mixer.init()
 
@@ -32,7 +24,7 @@ system_prompt = "You are Jarvis, Brandon's human assistant. You are witty and fu
 RECORDING_PATH = "audio/recording.wav"
 
 
-def request_gpt(messages: list[dict]) -> str:
+def ask_ai(messages: list[dict]) -> str:
     """
     Send a prompt to the GPT-3 API and return the response.
 
@@ -50,7 +42,7 @@ def request_gpt(messages: list[dict]) -> str:
     response = client.chat.completions.create(
         model="gpt-4o-mini",
         temperature=0,
-        messages=messages,
+        messages=[{"role": "system", "content": system_prompt}] + messages,
     )
     return response.choices[0].message.content
 
@@ -71,7 +63,6 @@ def to_epoch(dt):
 def add_conversation_data(conversations_arr):
     directory = "entries"
 
-    # Get the current date at the start of the day (midnight)
     now = datetime.now()
     start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
     current_day_epoch = to_epoch(start_of_day)
@@ -81,8 +72,6 @@ def add_conversation_data(conversations_arr):
         if filename.endswith(".json") and str(current_day_epoch) in filename:
             matching_files.append(filename)
 
-    # for file in matching_files:
-    #     print("matched file: ", file)
     if len(matching_files) == 0:
         new_filename = f"{current_day_epoch}.json"
         file_path = os.path.join(directory, new_filename)
@@ -110,22 +99,12 @@ if __name__ == "__main__":
         conversation = []
         # Transcribe audio
         current_time = time()
-        # human_reply = groq_transcribe(RECORDING_PATH)
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         human_reply = transcribe_audio_file(RECORDING_PATH, "54.255.127.241")
-        # human_reply = " ".join(
-        #     word_dict.get("word") for word_dict in words if "word" in word_dict
-        # )
-        # conversation_data = {"human_reply": human_reply}
-        # with open("conv.json", "a") as f:
-        #     json.dump(conversation_data, f)
-        #     f.write("\n")
-        # add_conversation_data("user", human_reply)
         transcription_time = time() - current_time
         log(f"Finished transcribing in {transcription_time:.2f} seconds.")
 
-        # Get response from AI
         current_time = time()
         conversation.append({"role": "user", "content": human_reply})
         llm_conversation.append(
@@ -135,8 +114,7 @@ if __name__ == "__main__":
                 "content": human_reply,
             }
         )
-        ai_response = request_gpt(messages=conversation)
-        # ai_response = reflect_tool(human_reply, conversation)
+        ai_response = ask_ai(messages=conversation)
         conversation.append({"role": "assistant", "content": ai_response})
         llm_conversation.append(
             {
@@ -148,27 +126,13 @@ if __name__ == "__main__":
         gpt_time = time() - current_time
         log(f"Finished generating response in {gpt_time:.2f} seconds.")
 
-        # Convert response to audio
         current_time = time()
         get_audio_response(ai_response)
-        # audio = elevenlabs.generate(
-        #     text=response, voice="Adam", model="eleven_monolingual_v1"
-        # )
-        # elevenlabs.save(audio, "audio/response.wav")
         audio_time = time() - current_time
         log(f"Finished generating audio in {audio_time:.2f} seconds.")
 
-        # Play response
         log("Speaking...")
         sound = mixer.Sound("audio/response.wav")
-        # Add response as a new line to conv.txt
-        # with open("conv.txt", "a") as f:
-        #     f.write(f"{ai_response}\n")
-        # conversation_data = {"ai_response": ai_response}
-        # with open("conv.json", "a") as f:
-        #     json.dump(conversation_data, f)
-        #     f.write("\n")
-        # add_conversation_data("assistant", ai_response)
         add_conversation_data(llm_conversation)
         sound.play()
         pygame.time.wait(int(sound.get_length() * 1000))
