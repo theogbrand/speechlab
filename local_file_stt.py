@@ -3,7 +3,7 @@ from scripts.abax_live_transcribe import AbaxStreamingClient
 
 
 def transcribe_audio_file(
-    audio_file_path: str, server_uri: str, rate: int = 16000
+    audio_file_path: str, server_uri: str, rate: int = 32000
 ) -> str:
     """
     Transcribe an audio file using the AbaxStreamingClient.
@@ -11,7 +11,7 @@ def transcribe_audio_file(
     Args:
         audio_file_path (str): Path to the audio file to transcribe.
         server_uri (str): URI of the transcription server.
-        rate (int, optional): Rate in bytes/sec at which audio should be sent to the server. Defaults to 16000.
+        rate (int, optional): Rate in bytes/sec at which audio should be sent to the server. Defaults to 32000.
 
     Returns:
         str: The transcribed text.
