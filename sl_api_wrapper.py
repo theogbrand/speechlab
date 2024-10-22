@@ -21,8 +21,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-SPEECHLAB_PUBLIC_SERVER_URI = "54.255.127.241"
-
+SPEECHLAB_PUBLIC_SERVER_URI = "localhost"
+# Run with python3 -m uvicorn sl_api_wrapper:app --host 0.0.0.0 --port 8000
+# nohup python3 -m uvicorn sl_api_wrapper:app --host 0.0.0.0 --port 8000 > output.log 2>&1 &
+# ps aux | grep uvicorn
+# To Kill: pkill -f "uvicorn sl_api_wrapper:app"
 @app.get("/ping")
 def ping():
     return {"response": "PONG"}
