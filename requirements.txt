@@ -13,3 +13,4 @@ anthropic
 google-cloud-aiplatform
 google-auth
 keyboard
+fastapi[standard]
