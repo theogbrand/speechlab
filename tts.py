@@ -105,7 +105,7 @@ def elevenlabs_tts(text: str, save_path: str) -> str:
     )
 
     # Generating a unique file name for the output MP3 file
-    save_file_path = f"{save_path}.mp3"
+    save_file_path = f"{save_path}"
     # Writing the audio stream to the file
 
     with open(save_file_path, "wb") as f:
@@ -120,4 +120,4 @@ def elevenlabs_tts(text: str, save_path: str) -> str:
 
 
 if __name__ == "__main__":
-    elevenlabs_tts("你可以 帮我 Search Google SEA-LION in Singapore Ape ini?", "audio/test_elevenlabs")
+    elevenlabs_tts("你可以 帮我 Search Google SEA-LION in Singapore Ape ini?", "audio/test_elevenlabs.mp3")

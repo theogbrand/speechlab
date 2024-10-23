@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 import pygame
 from pygame import mixer
-from tts import get_audio_response
+from tts import elevenlabs_tts, get_audio_response
 
 from record import speech_to_text
 import json
@@ -173,12 +173,13 @@ if __name__ == "__main__":
         log(f"Finished generating response in {gpt_time:.2f} seconds.")
 
         current_time = time()
-        get_audio_response(ai_response)
+        # get_audio_response(ai_response)
+        elevenlabs_tts(ai_response, "audio/response.mp3")
         audio_time = time() - current_time
         log(f"Finished generating audio in {audio_time:.2f} seconds.")
 
         log("Speaking...")
-        sound = mixer.Sound("audio/response.wav")
+        sound = mixer.Sound("audio/response.mp3")
         add_conversation_data(llm_conversation)
         sound.play()
         pygame.time.wait(int(sound.get_length() * 1000))
