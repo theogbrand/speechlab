@@ -50,7 +50,7 @@ def ask_ai(messages: list[dict]) -> str:
     return response.choices[0].message.content
 
 
-def ask_ai(messages: List[Dict[str, str]]) -> str:
+def ask_sealion(messages: List[Dict[str, str]]) -> str:
     """
     Send a prompt to the SEA-LION API and return the response.
 
@@ -160,7 +160,7 @@ if __name__ == "__main__":
                 "content": human_reply,
             }
         )
-        ai_response = ask_ai(messages=conversation)
+        ai_response = ask_sealion(messages=conversation)
         conversation.append({"role": "assistant", "content": ai_response})
         llm_conversation.append(
             {
