@@ -2,6 +2,8 @@ import os
 from time import time
 import asyncio
 
+import requests
+from typing import List, Dict
 from dotenv import load_dotenv
 from openai import OpenAI
 import pygame
@@ -12,6 +14,7 @@ from record import speech_to_text
 import json
 from datetime import datetime
 from local_file_stt import transcribe_audio_file
+from local_whisper_stt import local_whisper_transcribe
 
 # Load API keys
 load_dotenv()
@@ -45,6 +48,47 @@ def ask_ai(messages: list[dict]) -> str:
         messages=[{"role": "system", "content": system_prompt}] + messages,
     )
     return response.choices[0].message.content
+
+
+def ask_ai(messages: List[Dict[str, str]]) -> str:
+    """
+    Send a prompt to the SEA-LION API and return the response.
+
+    Args:
+        messages: A list of message dictionaries, each containing 'role' and 'content'.
+
+    Returns:
+        The complete response as a string.
+
+    Raises:
+        requests.RequestException: If there's an error with the API request.
+        ValueError: If the API response is not in the expected format.
+    """
+    url = "https://api.sea-lion.ai/v1/chat/completions"
+    headers = {
+        "accept": "application/json",
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {os.environ['AISG_INFERENCE_API_KEY']}"
+    }
+    data = {
+        "messages": messages,
+        "model": "aisingapore/llama3-8b-cpt-sea-lionv2.1-instruct",
+        "stream": False,
+        "max_tokens": 128
+    }
+
+    try:
+        response = requests.post(url, headers=headers, json=data)
+        response.raise_for_status()
+        result = response.json()
+        
+        if "choices" not in result or not result["choices"]:
+            raise ValueError("Invalid response format from API")
+            
+        return result["choices"][0]["message"]["content"]
+
+    except requests.RequestException as e:
+        raise requests.RequestException(f"Error making request to SEA-LION API: {e}")
 
 
 def log(log: str):
@@ -103,6 +147,7 @@ if __name__ == "__main__":
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         human_reply = transcribe_audio_file(LOCAL_RECORDING_PATH, "54.255.127.241")
+        # human_reply = local_whisper_transcribe(LOCAL_RECORDING_PATH)["text"]
         transcription_time = time() - current_time
         log(f"Finished transcribing in {transcription_time:.2f} seconds.")
 

@@ -16,7 +16,8 @@ def get_audio_response(text):
         "voice": {
             "mode": "id",
             # Jarvis model id
-            "id": "1d92e61c-e8a2-4544-9d17-b6dfb38e212a"
+            # "id": "1d92e61c-e8a2-4544-9d17-b6dfb38e212a"
+            "id": "0c687b45-575e-455c-ba57-401a484cd7f7" # Sherry
         },
         "output_format": {
             "container": "raw",
