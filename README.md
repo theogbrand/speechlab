@@ -1,4 +1,21 @@
-UPDATES on Speechlab ASR engine
+# UPDATES on Speechlab ASR engine
+
+# Installation
+
+# Server setup ONLY
+* use system python, do not use venv, install packages directly using apt-install
+* install requirements ONLY for ```scripts/abax_live_transcribe.py``` and ```sl_api_wrapper.py```
+```bash
+sudo apt update
+sudo apt install python3-pip
+
+sudo apt install python3-ws4py python3-pyaudio
+```
+
+* Run server
+```bash
+
+```
 
 Updated on: October 16, 2024
 --------------------------------------------------------------------------------
