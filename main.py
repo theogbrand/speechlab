@@ -135,13 +135,35 @@ def add_conversation_data(conversations_arr):
 
 
 if __name__ == "__main__":
+    llm_conversation = []
+    conversation = []
+    user_prompt = """
+        You are an AI assistant with expert knowledge about Singapore and fluency in Singaporean English (Singlish), Chinese, and Malay. Your task is to communicate with Singaporean users who often use code-mixed sentences containing a blend of these languages.
+
+        Here is the user's input:
+        <user_input>
+        {{USER_INPUT}}
+        </user_input>
+
+        Analyze the input carefully, paying attention to any language mixing or code-switching between Singaporean English, Chinese, and Malay. Identify the user's intent and the context of their message.
+
+        Respond to the user appropriately based on their intent and the languages used in their input. Your response should:
+        1. Match the level of formality and tone of the user's input
+        2. Incorporate similar language mixing if present in the original message
+        3. Use Singaporean colloquialisms or expressions where appropriate
+        4. Provide relevant information or answers related to Singapore if the user is asking a question
+
+        Maintain a Singaporean context throughout your response. This includes references to local culture, customs, places, or current events when relevant to the conversation.
+
+        If the user's input is entirely in one language, respond in that same language unless the context requires otherwise.
+
+        Ensure your reply sounds natural and authentic to a Singaporean conversation.
+    """
     while True:
         # Record audio
         log("Listening...")
         speech_to_text()
         log("Done listening")
-        llm_conversation = []
-        conversation = []
         # Transcribe audio
         current_time = time()
         loop = asyncio.new_event_loop()
@@ -152,7 +174,12 @@ if __name__ == "__main__":
         log(f"Finished transcribing in {transcription_time:.2f} seconds.")
 
         current_time = time()
-        conversation.append({"role": "user", "content": human_reply})
+        conversation.append(
+            {
+                "role": "user",
+                "content": user_prompt.replace("{{USER_INPUT}}", human_reply),
+            }
+        )
         llm_conversation.append(
             {
                 "timestamp": to_epoch(datetime.now()),
