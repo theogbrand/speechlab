@@ -19,6 +19,9 @@ from local_whisper_stt import local_whisper_transcribe
 import instructor
 from litellm import completion
 from pydantic import BaseModel
+from queue import Queue
+import threading
+from typing import Dict, Tuple
 
 # Load API keys
 load_dotenv()
@@ -216,7 +219,6 @@ def rewrite_transcription(
 
         3. If the transcriptions differ significantly:
         a. Try to combine the most coherent parts from both.
-        b. If one transcription seems more accurate or complete, favor that one.
 
         4. Correct any obvious transcription errors or filler words (um, uh, etc.) that don't add meaning to the query.
 
@@ -343,6 +345,51 @@ def check_language(speechlab_transcription: str, whisper_transcription: str) -> 
         return "UNDETERMINED"
 
 
+def run_transcriptions() -> Tuple[str, str]:
+    """
+    Run parallel transcriptions using threading and a thread-safe queue
+    Returns tuple of (speechlab_transcription, whisper_transcription)
+    """
+    result_queue: Queue = Queue()
+    
+    def speechlab_worker() -> None:
+        """Worker function for SpeechLab transcription"""
+        try:
+            result = transcribe_audio_file(LOCAL_RECORDING_PATH, "54.255.127.241")
+            result_queue.put(("speechlab", result))
+        except Exception as e:
+            result_queue.put(("speechlab", f"Error: {str(e)}"))
+    
+    def whisper_worker() -> None:
+        """Worker function for Whisper transcription"""
+        try:
+            result = local_whisper_transcribe(LOCAL_RECORDING_PATH)
+            result_queue.put(("whisper", result["text"]))
+        except Exception as e:
+            result_queue.put(("whisper", f"Error: {str(e)}"))
+
+    # Create and start threads
+    threads = [
+        threading.Thread(target=speechlab_worker),
+        threading.Thread(target=whisper_worker)
+    ]
+    
+    for thread in threads:
+        thread.start()
+    
+    # Wait for both threads to complete
+    results: Dict[str, str] = {}
+    for _ in threads:
+        source, result = result_queue.get()
+        print(f"Done transcribing with {source}", result)
+        results[source] = result
+    
+    for thread in threads:
+        thread.join()
+        
+    return results["speechlab"], results["whisper"]
+
+
 if __name__ == "__main__":
     llm_conversation = []
     conversation = []
@@ -374,32 +421,13 @@ if __name__ == "__main__":
         speech_to_text()
         log("Done listening")
         # Transcribe audio
-        current_time = time()
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
 
-        # Run transcriptions in parallel using asyncio tasks
-        async def run_transcriptions():
-            # Create tasks for both transcription functions
-            speechlab_task = asyncio.create_task(
-                asyncio.to_thread(transcribe_audio_file, LOCAL_RECORDING_PATH, "54.255.127.241")
-            )
-            whisper_task = asyncio.create_task(
-                asyncio.to_thread(local_whisper_transcribe, LOCAL_RECORDING_PATH)
-            )
-            
-            # Wait for both tasks to complete
-            speechlab_transcription = await speechlab_task
-            whisper_result = await whisper_task
-            whisper_transcription = whisper_result["text"]
-            
-            print("Done transcribing with SpeechLab", speechlab_transcription)
-            print("Done transcribing with Whisper", whisper_transcription)
-            
-            return speechlab_transcription, whisper_transcription
-            
-        # Run the async function and get results
-        speechlab_transcription, whisper_transcription = loop.run_until_complete(run_transcriptions())
+        log("Start transcribing...")
+        current_time = time()
+        # directly imports wav file
+        speechlab_transcription, whisper_transcription = run_transcriptions()
 
         # speechlab_transcription = "nama saya jason"
         # whisper_transcription = "nama saya jason"
@@ -453,3 +481,4 @@ if __name__ == "__main__":
         sound.play()
         pygame.time.wait(int(sound.get_length() * 1000))
         print(f"\n --- USER: {human_reply}\n --- JARVIS: {ai_response}\n")
+
