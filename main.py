@@ -16,7 +16,9 @@ import json
 from datetime import datetime
 from local_file_stt import transcribe_audio_file
 from local_whisper_stt import local_whisper_transcribe
-import litellm
+import instructor
+from litellm import completion
+from pydantic import BaseModel
 
 # Load API keys
 load_dotenv()
@@ -59,7 +61,7 @@ def ask_claude(user_input: str) -> str:
             "content": claude_user_prompt.replace("{{USER_INPUT}}", user_input),
         }
     ]
-    response = litellm.completion(
+    response = completion(
         model="claude-3-5-sonnet-20241022",
         messages=messages,
     )
@@ -182,6 +184,187 @@ def add_conversation_data(conversations_arr):
             f.truncate()
             json.dump(data, f)
 
+def check_language_and_rewrite_transcription(
+    speechlab_transcription: str, whisper_transcription: str
+) -> str:
+    language = check_language(speechlab_transcription, whisper_transcription)
+    # exit()
+
+    return rewrite_transcription(
+        speechlab_transcription, whisper_transcription, language
+    )
+
+
+def rewrite_transcription(
+    speechlab_transcription: str, whisper_transcription: str, language: str
+) -> str:
+    prompt = """
+        You are tasked with rewriting a user's query that has been transcribed from audio using two different ASR (Automatic Speech Recognition) systems. Your goal is to produce a single, coherent query in one language to avoid confusing downstream models.
+
+        Here are the two transcriptions of the same audio input:
+
+        <transcription1>
+        {{TRANSCRIPTION1}}
+        </transcription1>
+
+        <transcription2>
+        {{TRANSCRIPTION2}}
+        </transcription2>
+
+        The detected language for this audio input is:
+        <detected_language>
+        {{DETECTED_LANGUAGE}}
+        </detected_language>
+
+        Your task is to rewrite the query in a single language, preferably the detected language. Follow these guidelines:
+
+        1. If both transcriptions are in the same language and match the detected language, choose the more coherent or complete version.
+
+        2. If the transcriptions contain a mix of languages:
+        a. Prioritize the detected language.
+        b. Translate any important information from other languages into the main language.
+        c. Maintain the original meaning and intent of the query as much as possible.
+
+        3. If the transcriptions differ significantly:
+        a. Try to combine the most coherent parts from both.
+        b. If one transcription seems more accurate or complete, favor that one.
+
+        4. Correct any obvious transcription errors or filler words (um, uh, etc.) that don't add meaning to the query.
+
+        5. Ensure the final query is grammatically correct and makes sense in the context of a user input.
+
+        Provide your rewritten query inside <rewritten_query> tags. After the rewritten query, briefly explain your reasoning for the changes made inside <explanation> tags.
+
+        Here are some examples of how to handle different scenarios:
+
+        Example 1:
+        <transcription1>Hello, como estás? I need ayuda with mi computer.</transcription1>
+        <transcription2>Hello, cómo estás? I need help with my computer.</transcription2>
+        <detected_language>English</detected_language>
+
+        <rewritten_query>Hello, how are you? I need help with my computer.</rewritten_query>
+        <explanation>The detected language is English, so I translated the Spanish phrases and corrected "ayuda" to "help". I chose "how are you" from the second transcription as it's the correct spelling.</explanation>
+
+        Example 2:
+        <transcription1>Je voudrais un café, s'il vous plaît.</transcription1>
+        <transcription2>Je voudrais un cafe si vous plait.</transcription2>
+        <detected_language>French</detected_language>
+
+        <rewritten_query>Je voudrais un café, s'il vous plaît.</rewritten_query>
+        <explanation>Both transcriptions are in French, matching the detected language. I chose the first transcription as it has the correct accents and punctuation.</explanation>
+
+        Now, please proceed with rewriting the given query based on the provided transcriptions and detected language.
+    """
+
+    resp = completion(
+        model="claude-3-5-sonnet-20241022",
+        max_tokens=1024,
+        messages=[
+            {
+                "role": "user",
+                "content": prompt.replace("{{TRANSCRIPTION1}}", speechlab_transcription)
+                .replace("{{TRANSCRIPTION2}}", whisper_transcription)
+                .replace("{{DETECTED_LANGUAGE}}", language),
+            }
+        ],
+    )
+
+    try:
+        response_text = resp.choices[0].message.content
+        print("response_text", response_text)
+
+        # Find content between <rewritten_query> tags
+        rewritten_query_match = re.search(
+            r"<rewritten_query>(.*?)</rewritten_query>", response_text, re.DOTALL
+        )
+
+        # Find content between <explanation> tags
+        explanation_match = re.search(
+            r"<explanation>(.*?)</explanation>", response_text, re.DOTALL
+        )
+        print(explanation_match.group(1).strip())
+    except Exception as e:
+        print("Error in rewrite_transcription", e)
+        # return whisper_transcription
+    # Extract the rewritten query and explanation from the response using regex
+
+    # Use the rewritten query if found, otherwise return original whisper transcription
+    if rewritten_query_match:
+        print("rewritten_query_match", rewritten_query_match.group(1).strip())
+        return rewritten_query_match.group(1).strip()
+    else:
+        print(
+            "Could not find rewritten query in response, using original transcription",
+        )
+        return whisper_transcription
+
+
+def check_language(speechlab_transcription: str, whisper_transcription: str) -> str:
+    prompt = """
+        You are an AI language analyst tasked with determining the language of an audio clip based on two ASR (Automatic Speech Recognition) transcriptions. Your goal is to identify whether the transcriptions are in English only, Indonesian only, or if the language cannot be determined. This information will be used to select the appropriate TTS (Text-to-Speech) model for downstream processing.
+
+        You will be given two transcriptions of the same audio clip:
+
+        Transcription 1:
+        <transcription1>
+        {{TRANSCRIPTION1}}
+        </transcription1>
+
+        Transcription 2:
+        <transcription2>
+        {{TRANSCRIPTION2}}
+        </transcription2>
+
+        Analyze both transcriptions carefully, looking for clear indicators of either English or Indonesian language. Consider the following:
+
+        1. Vocabulary: Are the words distinctly English or Indonesian?
+        2. Sentence structure: Does the word order follow English or Indonesian grammar rules?
+        3. Common phrases or expressions: Are there any idioms or expressions specific to either language?
+        4. Names or places: Are there any names or places mentioned that are typically associated with English-speaking or Indonesian-speaking regions?
+
+        If both transcriptions consistently indicate the same language (either English or Indonesian), determine that as the language. If there is a mix of languages or if the transcriptions are too short or unclear to make a definitive determination, classify it as UNDETERMINED.
+
+        Provide your analysis and determination in JSON format. Include a "language" field with the value "ENGLISH", "INDONESIAN", or "UNDETERMINED", and a "reasoning" field explaining your decision.
+
+        Example output:
+        {
+        "language": "ENGLISH",
+        "reasoning": "Both transcriptions contain clear English vocabulary and sentence structures. No Indonesian words or phrases were detected."
+        }
+
+        Ensure your response is in valid JSON format and includes both the language determination and reasoning.
+    """
+
+    # check transcription language if English only, Indonesian only (code-mixed later)
+    class TranscriptionLanguage(BaseModel):
+        language: str
+        reasoning: str
+
+    client = instructor.from_litellm(completion)
+
+    resp = client.chat.completions.create(
+        model="claude-3-5-sonnet-20241022",
+        max_tokens=1024,
+        messages=[
+            {
+                "role": "user",
+                "content": prompt.replace(
+                    "{{TRANSCRIPTION1}}", speechlab_transcription
+                ).replace("{{TRANSCRIPTION2}}", whisper_transcription),
+            }
+        ],
+        response_model=TranscriptionLanguage,
+    )
+
+    try:
+        assert isinstance(resp, TranscriptionLanguage)
+        print("resp.language", resp.language)
+        print("resp.reasoning", resp.reasoning)
+        return resp.language
+    except Exception as e:
+        print("Error in check_language", e)
+        return "UNDETERMINED"
+
 
 if __name__ == "__main__":
     llm_conversation = []
@@ -217,8 +400,22 @@ if __name__ == "__main__":
         current_time = time()
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        human_reply = transcribe_audio_file(LOCAL_RECORDING_PATH, "54.255.127.241")
-        # human_reply = local_whisper_transcribe(LOCAL_RECORDING_PATH)["text"]
+
+        # run transcriptions in parallel
+        # speechlab_transcription = transcribe_audio_file(
+        #     LOCAL_RECORDING_PATH, "54.255.127.241"
+        # )  # 4s bottleneck
+        # print("Done transcribing with SpeechLab", speechlab_transcription)
+        # whisper_transcription = local_whisper_transcribe(LOCAL_RECORDING_PATH)["text"]
+        # print("Done transcribing with Whisper", whisper_transcription)
+
+        speechlab_transcription = "nama saya jason"
+        whisper_transcription = "nama saya jason"
+
+        human_reply = check_language_and_rewrite_transcription(
+            speechlab_transcription, whisper_transcription
+        )
+
         transcription_time = time() - current_time
         log(f"Finished transcribing in {transcription_time:.2f} seconds.")
 
@@ -236,8 +433,8 @@ if __name__ == "__main__":
                 "content": human_reply,
             }
         )
-        # ai_response = ask_sealion(messages=conversation)
-        ai_response = ask_claude(human_reply)
+        ai_response = ask_sealion(messages=conversation)
+        # ai_response = ask_claude(human_reply)
         conversation.append({"role": "assistant", "content": ai_response})
         llm_conversation.append(
             {
@@ -251,6 +448,9 @@ if __name__ == "__main__":
 
         current_time = time()
         # get_audio_response(ai_response)
+
+        # based on the language of the human_reply, choose the appropriate voice (indonesian v.s. SL)
+
         elevenlabs_tts(ai_response, "audio/response.mp3")
         audio_time = time() - current_time
         log(f"Finished generating audio in {audio_time:.2f} seconds.")
