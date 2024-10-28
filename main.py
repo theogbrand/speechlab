@@ -4,7 +4,7 @@ from time import time
 import asyncio
 
 import requests
-from typing import List, Dict
+from typing import List, Dict, Literal
 from dotenv import load_dotenv
 from openai import OpenAI
 import pygame
@@ -184,16 +184,6 @@ def add_conversation_data(conversations_arr):
             f.truncate()
             json.dump(data, f)
 
-def check_language_and_rewrite_transcription(
-    speechlab_transcription: str, whisper_transcription: str
-) -> str:
-    language = check_language(speechlab_transcription, whisper_transcription)
-    # exit()
-
-    return rewrite_transcription(
-        speechlab_transcription, whisper_transcription, language
-    )
-
 
 def rewrite_transcription(
     speechlab_transcription: str, whisper_transcription: str, language: str
@@ -216,14 +206,13 @@ def rewrite_transcription(
         {{DETECTED_LANGUAGE}}
         </detected_language>
 
-        Your task is to rewrite the query in a single language, preferably the detected language. Follow these guidelines:
+        Your task is to rewrite the query in the detected language. Follow these guidelines:
 
         1. If both transcriptions are in the same language and match the detected language, choose the more coherent or complete version.
 
         2. If the transcriptions contain a mix of languages:
         a. Prioritize the detected language.
-        b. Translate any important information from other languages into the main language.
-        c. Maintain the original meaning and intent of the query as much as possible.
+        b. Maintain the original meaning and intent of the query as much as possible.
 
         3. If the transcriptions differ significantly:
         a. Try to combine the most coherent parts from both.
@@ -231,7 +220,7 @@ def rewrite_transcription(
 
         4. Correct any obvious transcription errors or filler words (um, uh, etc.) that don't add meaning to the query.
 
-        5. Ensure the final query is grammatically correct and makes sense in the context of a user input.
+        5. Ensure the final query is grammatically correct in the detected language and makes sense in the context of a user input.
 
         Provide your rewritten query inside <rewritten_query> tags. After the rewritten query, briefly explain your reasoning for the changes made inside <explanation> tags.
 
@@ -271,7 +260,6 @@ def rewrite_transcription(
 
     try:
         response_text = resp.choices[0].message.content
-        print("response_text", response_text)
 
         # Find content between <rewritten_query> tags
         rewritten_query_match = re.search(
@@ -279,10 +267,10 @@ def rewrite_transcription(
         )
 
         # Find content between <explanation> tags
-        explanation_match = re.search(
-            r"<explanation>(.*?)</explanation>", response_text, re.DOTALL
-        )
-        print(explanation_match.group(1).strip())
+        # explanation_match = re.search(
+        #     r"<explanation>(.*?)</explanation>", response_text, re.DOTALL
+        # )
+        # print("explanation: ", explanation_match.group(1).strip())
     except Exception as e:
         print("Error in rewrite_transcription", e)
         # return whisper_transcription
@@ -290,7 +278,7 @@ def rewrite_transcription(
 
     # Use the rewritten query if found, otherwise return original whisper transcription
     if rewritten_query_match:
-        print("rewritten_query_match", rewritten_query_match.group(1).strip())
+        print("rewritten_query", rewritten_query_match.group(1).strip())
         return rewritten_query_match.group(1).strip()
     else:
         print(
@@ -322,22 +310,12 @@ def check_language(speechlab_transcription: str, whisper_transcription: str) -> 
         3. Common phrases or expressions: Are there any idioms or expressions specific to either language?
         4. Names or places: Are there any names or places mentioned that are typically associated with English-speaking or Indonesian-speaking regions?
 
-        If both transcriptions consistently indicate the same language (either English or Indonesian), determine that as the language. If there is a mix of languages or if the transcriptions are too short or unclear to make a definitive determination, classify it as UNDETERMINED.
-
-        Provide your analysis and determination in JSON format. Include a "language" field with the value "ENGLISH", "INDONESIAN", or "UNDETERMINED", and a "reasoning" field explaining your decision.
-
-        Example output:
-        {
-        "language": "ENGLISH",
-        "reasoning": "Both transcriptions contain clear English vocabulary and sentence structures. No Indonesian words or phrases were detected."
-        }
-
-        Ensure your response is in valid JSON format and includes both the language determination and reasoning.
+        If both transcriptions consistently indicate the same language (either English or Indonesian), determine that as the language. If there is a mix of languages or if the transcriptions are too short or unclear to make a definitive determination, pick the most likely language.
     """
 
     # check transcription language if English only, Indonesian only (code-mixed later)
     class TranscriptionLanguage(BaseModel):
-        language: str
+        language: Literal["ENGLISH", "INDONESIAN"]
         reasoning: str
 
     client = instructor.from_litellm(completion)
@@ -358,8 +336,7 @@ def check_language(speechlab_transcription: str, whisper_transcription: str) -> 
 
     try:
         assert isinstance(resp, TranscriptionLanguage)
-        print("resp.language", resp.language)
-        print("resp.reasoning", resp.reasoning)
+        print("language detected: ", resp.language)
         return resp.language
     except Exception as e:
         print("Error in check_language", e)
@@ -402,18 +379,18 @@ if __name__ == "__main__":
         asyncio.set_event_loop(loop)
 
         # run transcriptions in parallel
-        # speechlab_transcription = transcribe_audio_file(
-        #     LOCAL_RECORDING_PATH, "54.255.127.241"
-        # )  # 4s bottleneck
-        # print("Done transcribing with SpeechLab", speechlab_transcription)
-        # whisper_transcription = local_whisper_transcribe(LOCAL_RECORDING_PATH)["text"]
-        # print("Done transcribing with Whisper", whisper_transcription)
+        speechlab_transcription = transcribe_audio_file(
+            LOCAL_RECORDING_PATH, "54.255.127.241"
+        )  # 4s bottleneck
+        print("Done transcribing with SpeechLab", speechlab_transcription)
+        whisper_transcription = local_whisper_transcribe(LOCAL_RECORDING_PATH)["text"]
+        print("Done transcribing with Whisper", whisper_transcription)
 
-        speechlab_transcription = "nama saya jason"
-        whisper_transcription = "nama saya jason"
-
-        human_reply = check_language_and_rewrite_transcription(
-            speechlab_transcription, whisper_transcription
+        # speechlab_transcription = "nama saya jason"
+        # whisper_transcription = "nama saya jason"
+        language = check_language(speechlab_transcription, whisper_transcription)
+        human_reply = rewrite_transcription(
+            speechlab_transcription, whisper_transcription, language
         )
 
         transcription_time = time() - current_time
@@ -451,7 +428,7 @@ if __name__ == "__main__":
 
         # based on the language of the human_reply, choose the appropriate voice (indonesian v.s. SL)
 
-        elevenlabs_tts(ai_response, "audio/response.mp3")
+        elevenlabs_tts(ai_response, "audio/response.mp3", language)
         audio_time = time() - current_time
         log(f"Finished generating audio in {audio_time:.2f} seconds.")
 
