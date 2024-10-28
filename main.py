@@ -22,6 +22,8 @@ from pydantic import BaseModel
 from queue import Queue
 import threading
 from typing import Dict, Tuple
+import google.generativeai as genai
+
 
 # Load API keys
 load_dotenv()
@@ -320,11 +322,16 @@ def check_language(speechlab_transcription: str, whisper_transcription: str) -> 
         language: Literal["ENGLISH", "INDONESIAN"]
         reasoning: str
 
-    client = instructor.from_litellm(completion)
+    genai.configure(api_key=os.environ["GEMINI_API_KEY"])
 
-    resp = client.chat.completions.create(
-        model="claude-3-5-sonnet-20241022",
-        max_tokens=1024,
+    client = instructor.from_gemini(
+        client=genai.GenerativeModel(
+            model_name="models/gemini-1.5-flash-latest",
+        ),
+        mode=instructor.Mode.GEMINI_JSON,
+    )
+
+    resp = client.messages.create(
         messages=[
             {
                 "role": "user",
@@ -335,6 +342,22 @@ def check_language(speechlab_transcription: str, whisper_transcription: str) -> 
         ],
         response_model=TranscriptionLanguage,
     )
+
+    # client = instructor.from_litellm(completion)
+
+    # resp = client.chat.completions.create(
+    #     model="claude-3-5-sonnet-20241022",
+    #     max_tokens=1024,
+    #     messages=[
+    #         {
+    #             "role": "user",
+    #             "content": prompt.replace(
+    #                 "{{TRANSCRIPTION1}}", speechlab_transcription
+    #             ).replace("{{TRANSCRIPTION2}}", whisper_transcription),
+    #         }
+    #     ],
+    #     response_model=TranscriptionLanguage,
+    # )
 
     try:
         assert isinstance(resp, TranscriptionLanguage)
