@@ -1,4 +1,5 @@
 import os
+import re
 from time import time
 import asyncio
 
@@ -15,6 +16,7 @@ import json
 from datetime import datetime
 from local_file_stt import transcribe_audio_file
 from local_whisper_stt import local_whisper_transcribe
+import litellm
 
 # Load API keys
 load_dotenv()
@@ -23,11 +25,58 @@ load_dotenv()
 mixer.init()
 
 # Change the context if you want to change Jarvis' personality
-system_prompt = "You are Jarvis, Brandon's human assistant. You are witty and full of personality. Your answers should usually be crisp in 1-2 short sentences, unless a discussion is rightfully necessary."
+system_prompt = ""
 LOCAL_RECORDING_PATH = "audio/recording.wav"
 SAVE_CONVERSATION_DIR = "entries"
 
-def ask_ai(messages: list[dict]) -> str:
+
+def ask_claude(user_input: str) -> str:
+    claude_user_prompt = """
+        You are an AI assistant with expert knowledge about Singapore and fluency in Singaporean English (Singlish), Chinese, and Malay. Your task is to communicate with Singaporean users who often use code-mixed sentences containing a blend of these languages.
+
+        Here is the user's input:
+        <user_input>
+        {{USER_INPUT}}
+        </user_input>
+
+        Analyze the input carefully, paying attention to any language mixing or code-switching between Singaporean English, Chinese, and Malay. Identify the user's intent and the context of their message.
+
+        Respond to the user appropriately based on their intent and the languages used in their input. Your response should:
+        1. Match the level of formality and tone of the user's input
+        2. Incorporate similar language mixing if present in the original message
+        3. Use Singaporean colloquialisms or expressions where appropriate
+        4. Provide relevant information or answers related to Singapore if the user is asking a question
+
+        Maintain a Singaporean context throughout your response. This includes references to local culture, customs, places, or current events when relevant to the conversation.
+
+        If the user's input is entirely in one language, respond in that same language unless the context requires otherwise.
+
+        Think step-by-step in <thinking> tags and then provide your response inside <response> tags. Ensure your reply sounds natural and authentic to a Singaporean conversation. Reply only in one language.
+    """
+    messages = [
+        {
+            "role": "user",
+            "content": claude_user_prompt.replace("{{USER_INPUT}}", user_input),
+        }
+    ]
+    response = litellm.completion(
+        model="claude-3-5-sonnet-20241022",
+        messages=messages,
+    )
+    # Extract response content between <response> tags
+    response_text = response.choices[0].message.content
+
+    # Use regex to find content between <response> tags
+    match = re.search(r"<response>(.*?)</response>", response_text, re.DOTALL)
+    if not match:
+        # If no tags found, return the full response
+        return response_text.strip()
+
+    # Return just the content between tags
+    return match.group(1).strip()
+
+
+def ask_openai(messages: list[dict]) -> str:
     """
     Send a prompt to the GPT-3 API and return the response.
 
@@ -187,7 +236,8 @@ if __name__ == "__main__":
                 "content": human_reply,
             }
         )
-        ai_response = ask_sealion(messages=conversation)
+        # ai_response = ask_sealion(messages=conversation)
+        ai_response = ask_claude(human_reply)
         conversation.append({"role": "assistant", "content": ai_response})
         llm_conversation.append(
             {
