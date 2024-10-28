@@ -378,13 +378,28 @@ if __name__ == "__main__":
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
 
-        # run transcriptions in parallel
-        speechlab_transcription = transcribe_audio_file(
-            LOCAL_RECORDING_PATH, "54.255.127.241"
-        )  # 4s bottleneck
-        print("Done transcribing with SpeechLab", speechlab_transcription)
-        whisper_transcription = local_whisper_transcribe(LOCAL_RECORDING_PATH)["text"]
-        print("Done transcribing with Whisper", whisper_transcription)
+        # Run transcriptions in parallel using asyncio tasks
+        async def run_transcriptions():
+            # Create tasks for both transcription functions
+            speechlab_task = asyncio.create_task(
+                asyncio.to_thread(transcribe_audio_file, LOCAL_RECORDING_PATH, "54.255.127.241")
+            )
+            whisper_task = asyncio.create_task(
+                asyncio.to_thread(local_whisper_transcribe, LOCAL_RECORDING_PATH)
+            )
+            
+            # Wait for both tasks to complete
+            speechlab_transcription = await speechlab_task
+            whisper_result = await whisper_task
+            whisper_transcription = whisper_result["text"]
+            
+            print("Done transcribing with SpeechLab", speechlab_transcription)
+            print("Done transcribing with Whisper", whisper_transcription)
+            
+            return speechlab_transcription, whisper_transcription
+            
+        # Run the async function and get results
+        speechlab_transcription, whisper_transcription = loop.run_until_complete(run_transcriptions())
 
         # speechlab_transcription = "nama saya jason"
         # whisper_transcription = "nama saya jason"
