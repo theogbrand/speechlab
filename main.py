@@ -18,7 +18,7 @@ from local_file_stt import transcribe_audio_file
 from local_whisper_stt import local_whisper_transcribe
 import instructor
 from litellm import completion
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from queue import Queue
 import threading
 from typing import Dict, Tuple
@@ -35,7 +35,7 @@ mixer.init()
 system_prompt = ""
 LOCAL_RECORDING_PATH = "audio/recording.wav"
 SAVE_CONVERSATION_DIR = "entries"
-
+genai.configure(api_key=os.environ["GEMINI_API_KEY"])
 
 def ask_claude(user_input: str) -> str:
     claude_user_prompt = """
@@ -193,7 +193,7 @@ def add_conversation_data(conversations_arr):
 def rewrite_transcription(
     speechlab_transcription: str, whisper_transcription: str, language: str
 ) -> str:
-    prompt = """
+    claude_prompt = """
         You are tasked with rewriting a user's query that has been transcribed from audio using two different ASR (Automatic Speech Recognition) systems. Your goal is to produce a single, coherent query in one language to avoid confusing downstream models.
 
         Here are the two transcriptions of the same audio input:
@@ -255,7 +255,9 @@ def rewrite_transcription(
         messages=[
             {
                 "role": "user",
-                "content": prompt.replace("{{TRANSCRIPTION1}}", speechlab_transcription)
+                "content": claude_prompt.replace(
+                    "{{TRANSCRIPTION1}}", speechlab_transcription
+                )
                 .replace("{{TRANSCRIPTION2}}", whisper_transcription)
                 .replace("{{DETECTED_LANGUAGE}}", language),
             }
@@ -278,8 +280,8 @@ def rewrite_transcription(
     except Exception as e:
         print("Error in rewrite_transcription", e)
         # return whisper_transcription
-    # Extract the rewritten query and explanation from the response using regex
 
+    # Extract the rewritten query and explanation from the response using regex
     # Use the rewritten query if found, otherwise return original whisper transcription
     if rewritten_query_match:
         print("rewritten_query", rewritten_query_match.group(1).strip())
@@ -289,6 +291,69 @@ def rewrite_transcription(
             "Could not find rewritten query in response, using original transcription",
         )
         return whisper_transcription
+
+    # gemini_prompt = """
+    #     You are tasked with rewriting a user's query that has been transcribed from audio using two different ASR (Automatic Speech Recognition) systems. Your goal is to produce a single, coherent query in one language to avoid confusing downstream models.
+
+    #     Here are the two transcriptions of the same audio input:
+
+    #     <transcription1>
+    #     {{TRANSCRIPTION1}}
+    #     </transcription1>
+
+    #     <transcription2>
+    #     {{TRANSCRIPTION2}}
+    #     </transcription2>
+
+    #     The detected language for this audio input is:
+    #     <detected_language>
+    #     {{DETECTED_LANGUAGE}}
+    #     </detected_language>
+
+    #     Your task is to rewrite the query in the detected language. Follow these guidelines:
+
+    #     1. If both transcriptions are in the same language and match the detected language, choose the more coherent or complete version.
+
+    #     2. If the transcriptions contain a mix of languages:
+    #     a. Prioritize the detected language.
+    #     b. Maintain the original meaning and intent of the query as much as possible.
+
+    #     3. If the transcriptions differ significantly:
+    #     a. Try to combine the most coherent parts from both.
+
+    #     4. Correct any obvious transcription errors or filler words (um, uh, etc.) that don't add meaning to the query.
+
+    #     5. Ensure the final query is grammatically correct in the detected language and makes sense in the context of a user input.
+
+    #     Now, please proceed with rewriting the given query based on the provided transcriptions and detected language.
+    # """
+
+    # class RewrittenQuery(BaseModel):
+    #     chain_of_thought: str
+    #     rewritten_query: str = Field(
+    #         description="The rewritten query in the detected language."
+    #     )
+
+    # client = instructor.from_gemini(
+    #     client=genai.GenerativeModel(
+    #         model_name="models/gemini-1.5-flash-latest",
+    #     ),
+    #     mode=instructor.Mode.GEMINI_JSON,
+    # )
+
+    # resp = client.messages.create(
+    #     messages=[
+    #         {
+    #             "role": "user",
+    #             "content": gemini_prompt.replace(
+    #                 "{{TRANSCRIPTION1}}", speechlab_transcription
+    #             ).replace("{{TRANSCRIPTION2}}", whisper_transcription),
+    #         }
+    #     ],
+    #     response_model=RewrittenQuery,
+    # )
+    # print("rewritten_query: ", resp.rewritten_query)
+    # return resp.rewritten_query
 
 
 def check_language(speechlab_transcription: str, whisper_transcription: str) -> str:
@@ -319,10 +384,8 @@ def check_language(speechlab_transcription: str, whisper_transcription: str) -> 
 
     # check transcription language if English only, Indonesian only (code-mixed later)
     class TranscriptionLanguage(BaseModel):
+        chain_of_thought: str
         language: Literal["ENGLISH", "INDONESIAN"]
-        reasoning: str
-
-    genai.configure(api_key=os.environ["GEMINI_API_KEY"])
 
     client = instructor.from_gemini(
         client=genai.GenerativeModel(
@@ -330,7 +393,6 @@ def check_language(speechlab_transcription: str, whisper_transcription: str) -> 
         ),
         mode=instructor.Mode.GEMINI_JSON,
     )
-
     resp = client.messages.create(
         messages=[
             {
