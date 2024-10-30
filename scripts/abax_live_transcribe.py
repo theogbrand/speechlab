@@ -83,7 +83,7 @@ class AbaxStreamingClient(WebSocketClient):
             self.audio = pyaudio.PyAudio()
         self.isStop = False
     
-    @rate_limited(25)
+    # @rate_limited(25)
     def send_data(self, data):
         self.send(data, binary=True)
     
@@ -110,7 +110,7 @@ class AbaxStreamingClient(WebSocketClient):
                 
             elif self.mode == 'file':
                 with self.audiofile as audiostream:
-                    for block in iter(lambda: audiostream.read(int(self.byterate/25)), ""):
+                    for block in iter(lambda: audiostream.read(int(self.byterate)), ""): # instead of splitting into 25 segments 
                         self.send_data(block)
                         if (len(block) == 0):
                           break
@@ -133,14 +133,14 @@ class AbaxStreamingClient(WebSocketClient):
 
                     #print("\033[H\033[J") # clear console for better output
                     # if (trans != "<blank>") and (trans != "") and (trans != "ya") and (trans != "i") and (trans != "a") and (trans != "okay") and (trans != "嗯"):
-                    self.final_hyps.append(trans)
+                    self.final_hyps.append(trans) # instead of appending to final_hyps, we can stream
                     # print ("+" + str(delta) + ": " + trans)
         else:
             if 'message' in response:
                 print("Server message: %s" %  response['message'])
 
 
-    def get_full_hyp(self, timeout=60):
+    def get_full_hyp(self, timeout=10):
         return self.final_hyp_queue.get(timeout)
 
     def closed(self, code, reason=None):
