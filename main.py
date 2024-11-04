@@ -24,6 +24,7 @@ import threading
 from typing import Dict, Tuple
 import google.generativeai as genai
 
+# use streamlit to run this ASR demo, separate flag for English and Indonesian mode.
 
 # Load API keys
 load_dotenv()

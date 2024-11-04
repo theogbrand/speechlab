@@ -90,7 +90,8 @@ def elevenlabs_tts(text: str, save_path: str, language: str) -> str:
     """
     language_to_voice_id = {
         "ENGLISH": "mbL34QDB5FptPamlgvX5",  # Jay - Asian, Singapore
-        "INDONESIAN": "1k39YpzqXZn52BgyLyGO",  # Bee Ard - Indonesian
+        # "INDONESIAN": "1k39YpzqXZn52BgyLyGO",  # Bee Ard - Indonesian
+        "INDONESIAN": "v70fYBHUOrHA3AKIBjPq",  # Mahaputra - Indonesian
     }
     # Calling the text_to_speech conversion API with detailed parameters
     response = client.text_to_speech.convert(
